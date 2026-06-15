@@ -46,7 +46,7 @@ if platform == 'android':
                     Uri = autoclass('android.net.Uri')
                     
                     activity = PythonActivity.mActivity
-                    # Создаем намерение (Intent) открыть системные настройк�� для нашего приложения
+                    # Создаем намерение (Intent) открыть системные настройки для нашего приложения
                     intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                     uri = Uri.fromParts("package", activity.getPackageName(), None)
                     intent.setData(uri)
@@ -98,14 +98,18 @@ class FileLoadDialog(Popup):
 
         # Нижняя панель с кнопками
         buttons = BoxLayout(size_hint_y=0.15, spacing=10)
-        btn_cancel = Button(text="Отмена", on_release=self.dismiss)
-        btn_ok = Button(text="Открыть", on_release=self.confirm)
+        btn_cancel = Button(text="Отмена", on_release=self.dismiss, font_size=self.get_app_font_size('normal'))
+        btn_ok = Button(text="Открыть", on_release=self.confirm, font_size=self.get_app_font_size('normal'))
         
         buttons.add_widget(btn_cancel)
         buttons.add_widget(btn_ok)
         layout.add_widget(buttons)
         
         self.content = layout
+    
+    def get_app_font_size(self, size_type='normal'):
+        app = App.get_running_app()
+        return app.get_font_size(size_type)
 
     def confirm(self, instance):
         if self.file_chooser.selection:
@@ -130,21 +134,25 @@ class FileSaveDialog(Popup):
 
         # Поле для ввода имени файла
         input_panel = BoxLayout(size_hint_y=0.1, spacing=10)
-        input_panel.add_widget(Label(text="Имя файла:", size_hint_x=0.2))
-        self.txt_input = TextInput(text=default_name, multiline=False, size_hint_x=0.8)
+        input_panel.add_widget(Label(text="Имя файла:", size_hint_x=0.2, font_size=self.get_app_font_size('normal')))
+        self.txt_input = TextInput(text=default_name, multiline=False, size_hint_x=0.8, font_size=self.get_app_font_size('normal'))
         input_panel.add_widget(self.txt_input)
         layout.add_widget(input_panel)
 
         # Нижняя панель с кнопками
         buttons = BoxLayout(size_hint_y=0.15, spacing=10)
-        btn_cancel = Button(text="Отмена", on_release=self.dismiss)
-        btn_ok = Button(text="Сохранить", on_release=self.confirm)
+        btn_cancel = Button(text="Отмена", on_release=self.dismiss, font_size=self.get_app_font_size('normal'))
+        btn_ok = Button(text="Сохранить", on_release=self.confirm, font_size=self.get_app_font_size('normal'))
         
         buttons.add_widget(btn_cancel)
         buttons.add_widget(btn_ok)
         layout.add_widget(buttons)
         
         self.content = layout
+    
+    def get_app_font_size(self, size_type='normal'):
+        app = App.get_running_app()
+        return app.get_font_size(size_type)
 
     def confirm(self, instance):
         filename = self.txt_input.text.strip()
@@ -202,10 +210,10 @@ class MyApp(App):
         self.brush_radius = 5
         self.global_layer_opacity = 1.0  # Регулируемая переменная прозрачности
         
-        self.menu_btn = Button(text='Меню', size_hint_x=0.45)
+        self.menu_btn = Button(text='Меню', size_hint_x=0.35)
         self.tools_menu_btn = Button(text='Навигация', size_hint_x=0.35)
-        self.refresh_btn = Button(text='R', size_hint_x=0.1)  # Кнопка ручного обновления холста
-        self.exit_btn = Button(text='X', size_hint_x=0.1)
+        self.refresh_btn = Button(text='↺', size_hint_x=0.15)  # Кнопка ручного обновления холста
+        self.exit_btn = Button(text='✕', size_hint_x=0.15)
         
         self.exit_btn.bind(on_press=self.stop)
         self.refresh_btn.bind(on_press=lambda instance: self.visual())
@@ -217,31 +225,31 @@ class MyApp(App):
         """Динамический расчет размера шрифта в зависимости от габаритов экрана."""
         base_dim = min(Window.width, Window.height)
         if size_type == 'small':
-            return int(max(15, min(base_dim * 0.034, 24)))
+            return int(max(18, min(base_dim * 0.038, 26)))
         elif size_type == 'large':
-            return int(max(22, min(base_dim * 0.050, 34)))
+            return int(max(26, min(base_dim * 0.056, 38)))
         else: # normal
-            return int(max(18, min(base_dim * 0.042, 28)))
+            return int(max(22, min(base_dim * 0.048, 32)))
         
     def open_geo_calibration_popup(self, pixel_coords):
         px, py = pixel_coords
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
-        content.add_widget(Label(text=f"Точка на карте: X={px}, Y={py}\nВведите географические координаты:", size_hint_y=None, height='50dp', font_size=self.get_font_size('normal')))
+        content.add_widget(Label(text=f"Точка на карте: X={px}, Y={py}\nВведите географические координаты:", size_hint_y=None, height='60dp', font_size=self.get_font_size('normal')))
         
-        lat_input = TextInput(hint_text="Широта (Lat), ��апример: 55.7558", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
-        lon_input = TextInput(hint_text="Долгота (Lon), например: 37.6173", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
+        lat_input = TextInput(hint_text="Широта (Lat), например: 55.7558", multiline=False, size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        lon_input = TextInput(hint_text="Долгота (Lon), например: 37.6173", multiline=False, size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         
         content.add_widget(lat_input)
         content.add_widget(lon_input)
         
-        btn_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
+        btn_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='55dp')
         ok_btn = Button(text="Добавить", font_size=self.get_font_size('normal'))
         cancel_btn = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_layout.add_widget(ok_btn)
         btn_layout.add_widget(cancel_btn)
         content.add_widget(btn_layout)
         
-        popup = Popup(title='Привязка координаты', content=content, size_hint=(0.9, 0.45), auto_dismiss=False)
+        popup = Popup(title='Привязка координаты', content=content, size_hint=(0.9, 0.5), auto_dismiss=False)
         
         def save_geo_point(instance):
             try:
@@ -270,7 +278,7 @@ class MyApp(App):
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         from kivy.graphics import Color as KivyColor, Rectangle as KivyRect
 
-        color_preview = Widget(size_hint_y=None, height='50dp')
+        color_preview = Widget(size_hint_y=None, height='60dp')
         with color_preview.canvas:
             KivyColor(rgb_color[0]/255, rgb_color[1]/255, rgb_color[2]/255, 1)
             KivyRect(pos=color_preview.pos, size=color_preview.size)
@@ -278,18 +286,18 @@ class MyApp(App):
         color_preview.bind(size=lambda w, v: setattr(color_preview.canvas.children[1], 'size', v))
 
         content.add_widget(Label(
-            text=f"Выбр��н цвет RGB{rgb_color}\nПикселей будет найдено по Delta-E ≤ {main.delta_e_tolerance}",
-            size_hint_y=None, height='50dp', font_size=self.get_font_size('small')
+            text=f"Выбран цвет RGB{rgb_color}\nПикселей будет найдено по Delta-E ≤ {main.delta_e_tolerance}",
+            size_hint_y=None, height='60dp', font_size=self.get_font_size('normal')
         ))
         content.add_widget(color_preview)
 
         name_input = TextInput(
             hint_text=f"Имя слоя (по умолчанию: #_{len(main.sp_sloy)+1})",
-            multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal')
+            multiline=False, size_hint_y=None, height='50dp', font_size=self.get_font_size('normal')
         )
         content.add_widget(name_input)
 
-        btn_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
+        btn_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='55dp')
         ok_btn = Button(text="Создать слой", font_size=self.get_font_size('normal'))
         cancel_btn = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_row.add_widget(ok_btn)
@@ -297,7 +305,7 @@ class MyApp(App):
         content.add_widget(btn_row)
 
         popup = Popup(title='Пипетка — Delta-E сегментация', content=content,
-                      size_hint=(0.9, 0.55), auto_dismiss=False)
+                      size_hint=(0.9, 0.6), auto_dismiss=False)
 
         def do_segment(instance):
             popup.dismiss()
@@ -349,9 +357,9 @@ class MyApp(App):
     def show_popup_message(self, title, message):
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         content.add_widget(Label(text=message, font_size=self.get_font_size('normal')))
-        close_btn = Button(text="OK", size_hint_y=None, height='45dp', font_size=self.get_font_size('normal'))
+        close_btn = Button(text="OK", size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         content.add_widget(close_btn)
-        popup = Popup(title=title, content=content, size_hint=(0.8, 0.4), auto_dismiss=True)
+        popup = Popup(title=title, content=content, size_hint=(0.8, 0.45), auto_dismiss=True)
         close_btn.bind(on_release=popup.dismiss)
         popup.open()
 
@@ -397,7 +405,7 @@ class MyApp(App):
             if success:
                 print(f"Проект сохранен: {full_path}")
         except Exception as e:
-            print(f"Ошиб��а при сохранении: {e}")
+            print(f"Ошибка при сохранении: {e}")
             
     def load_project_dialog(self):
         dialog = FileLoadDialog(
@@ -463,20 +471,20 @@ class MyApp(App):
         content.add_widget(Label(
             text="Настройки ГИС", 
             size_hint_y=None, 
-            height='40dp', 
+            height='50dp', 
             font_size=self.get_font_size('large')
         ))
         
         # Область прокрутки для удобства на смартфонах
-        scroll = ScrollView(size_hint=(1, 0.78))
+        scroll = ScrollView(size_hint=(1, 0.75))
         settings_layout = BoxLayout(orientation='vertical', spacing=15, size_hint_y=None)
         settings_layout.bind(minimum_height=settings_layout.setter('height'))
 
         # Мобильный конструктор блоков: Текст сверху, крупный слайдер снизу
         def create_setting_block(label_text_template, min_val, max_val, curr_val, step_val, update_func):
-            block = BoxLayout(orientation='vertical', size_hint_y=None, height='80dp', spacing=5)
-            lbl = Label(text=label_text_template(curr_val), size_hint_y=0.4, font_size=self.get_font_size('small'))
-            slider = Slider(min=min_val, max=max_val, value=curr_val, step=step_val, size_hint_y=0.6)
+            block = BoxLayout(orientation='vertical', size_hint_y=None, height='90dp', spacing=5)
+            lbl = Label(text=label_text_template(curr_val), size_hint_y=0.35, font_size=self.get_font_size('small'))
+            slider = Slider(min=min_val, max=max_val, value=curr_val, step=step_val, size_hint_y=0.65)
             
             def on_val_change(instance, value):
                 update_func(value)
@@ -527,7 +535,7 @@ class MyApp(App):
         scroll.add_widget(settings_layout)
         content.add_widget(scroll)
         
-        close_btn = Button(text="Закрыть", size_hint_y=None, height='45dp', font_size=self.get_font_size('normal'))
+        close_btn = Button(text="Закрыть", size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         content.add_widget(close_btn)
         
         settings_popup = Popup(title='Настройки ГИС', content=content, size_hint=(0.9, 0.85), auto_dismiss=True)
@@ -591,33 +599,34 @@ class MyApp(App):
 
         main_layout = BoxLayout(orientation='vertical')
         
-        contral_panel = BoxLayout(orientation='horizontal', size_hint_y=0.09, spacing=5)
+        # Оптимизированная панель управления для горизонтального режима
+        contral_panel = BoxLayout(orientation='horizontal', size_hint_y=0.08, spacing=3, padding=2)
         contral_panel.add_widget(self.menu_btn)
         contral_panel.add_widget(self.tools_menu_btn)
-        contral_panel.add_widget(self.refresh_btn)  # Кнопка успешно добавлена в панель управления
+        contral_panel.add_widget(self.refresh_btn)
         contral_panel.add_widget(self.exit_btn)
         main_layout.add_widget(contral_panel)
         
         self.menu_btn.font_size = self.get_font_size('normal')
         self.tools_menu_btn.font_size = self.get_font_size('normal')
-        self.refresh_btn.font_size = self.get_font_size('normal')
-        self.exit_btn.font_size = self.get_font_size('normal')
+        self.refresh_btn.font_size = self.get_font_size('large')
+        self.exit_btn.font_size = self.get_font_size('large')
         
         self.dropdown_menu = DropDown()
-        unite_menu_btn = Button(text='Объединить слои', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        unite_menu_btn = Button(text='Объединить слои', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         unite_menu_btn.bind(on_release=lambda instance: self.dropdown_menu.select('unite'))
-        start_btn = Button(text='Новый расчет', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        start_btn = Button(text='Новый расчет', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         start_btn.bind(on_release=lambda instance: self.dropdown_menu.select('новый расчет'))
-        file_btn = Button(text='Выбрать файл', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        file_btn = Button(text='Выбрать файл', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         file_btn.bind(on_release=lambda instance: self.dropdown_menu.select('выбрать файл'))
-        save_btn = Button(text='Сохранить проект', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        save_btn = Button(text='Сохранить проект', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         save_btn.bind(on_release=lambda instance: self.dropdown_menu.select('сохранить'))
-        load_btn = Button(text='Загрузить проект', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        load_btn = Button(text='Загрузить проект', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         load_btn.bind(on_release=lambda instance: self.dropdown_menu.select('загрузить'))
-        settings_btn = Button(text='Настройки ГИС', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        settings_btn = Button(text='Настройки ГИС', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         settings_btn.bind(on_release=lambda instance: self.dropdown_menu.select('настройки'))
-        export_btn = Button(text='Экспорт GeoJSON', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
-        export_btn.bind(on_release=lambda instance: self.dropdown_menu.select('экспорт')) # Исправлен баг со строкой селектора
+        export_btn = Button(text='Экспорт GeoJSON', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
+        export_btn.bind(on_release=lambda instance: self.dropdown_menu.select('экспорт'))
         
         self.dropdown_menu.add_widget(unite_menu_btn)
         self.dropdown_menu.add_widget(start_btn)
@@ -631,15 +640,15 @@ class MyApp(App):
         self.dropdown_menu.bind(on_select=self.menu_select_handler)
         
         self.dropdown_tools = DropDown()
-        mode_view = Button(text='Навигация', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        mode_view = Button(text='Навигация', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         mode_view.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_prosmotra'))
-        mode_draw = Button(text='Карандаш', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        mode_draw = Button(text='Карандаш', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         mode_draw.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_karandasha'))
-        mode_erase = Button(text='Ластик', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        mode_erase = Button(text='Ластик', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         mode_erase.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_lastika'))
-        mode_geo = Button(text='Привязка', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        mode_geo = Button(text='Привязка', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         mode_geo.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_geotocki'))
-        mode_pipette = Button(text='Пипетка (легенда)', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        mode_pipette = Button(text='Пипетка (легенда)', size_hint_y=None, height='55dp', font_size=self.get_font_size('normal'))
         mode_pipette.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_pipetki'))
 
         self.dropdown_tools.add_widget(mode_view)
@@ -650,7 +659,7 @@ class MyApp(App):
         self.tools_menu_btn.bind(on_release=self.dropdown_tools.open)
         self.dropdown_tools.bind(on_select=self.tools_select_handler)
         
-        self.status_bar = Label(text="Ожидание действий. Откройте Меню.", size_hint_y=0.04, color=(0.9, 1, 0.9, 1), font_size=self.get_font_size('small'))
+        self.status_bar = Label(text="Ожидание действий. Откройте Меню.", size_hint_y=0.05, color=(0.9, 1, 0.9, 1), font_size=self.get_font_size('normal'))
         with self.status_bar.canvas.before:
             Color(45/255, 50/255, 55/255, 1)
             self.status_bg = Rectangle(pos=self.status_bar.pos, size=self.status_bar.size)
@@ -661,12 +670,14 @@ class MyApp(App):
         self.status_bar.bind(pos=resize_status_bg, size=resize_status_bg)
         main_layout.add_widget(self.status_bar)
         
-        workspace = BoxLayout(orientation='horizontal', size_hint_y=0.90)
-        self.map_scene = CustomMapScene(size_hint_x=0.7, do_rotation=False, auto_bring_to_front=False)
+        # Оптимизированный workspace для горизонтального режима
+        workspace = BoxLayout(orientation='horizontal', size_hint_y=0.87)
+        self.map_scene = CustomMapScene(size_hint_x=0.72, do_rotation=False, auto_bring_to_front=False)
         workspace.add_widget(self.map_scene)
         
-        scroll_container = ScrollView(size_hint_x=0.3)
-        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=5, padding=5)
+        # Боковая панель со слоями - увеличенные высоты элементов
+        scroll_container = ScrollView(size_hint_x=0.28)
+        self.list_layout = BoxLayout(orientation='vertical', size_hint_y=None, spacing=4, padding=4)
         self.list_layout.bind(minimum_height=self.list_layout.setter('height'))
         
         scroll_container.add_widget(self.list_layout)
@@ -681,7 +692,7 @@ class MyApp(App):
             
         if len(main.sp_sloy) > 150:
             self.status_bar.text = f"Ошибка: Создано слишком много слоев ({len(main.sp_sloy)}). Увеличьте min_dist в настройках!"
-            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Увеличьте размер кисти/шага в настройках.")
+            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Увеличьте размер кисти/шага расстояния!")
             return  
             
         for child in list(self.map_scene.children):
@@ -697,7 +708,7 @@ class MyApp(App):
         
         self.tool_mode = 'view'
         self.selected_layer_key = None
-        self.tools_menu_btn.text = "Навигация"
+        self.tools_menu_btn.text = "Нав��гация"
         self.status_bar.text = "Проект загружен. Режим: Навигация"
 
         for layer_data in main.sp_sloy:
@@ -716,23 +727,24 @@ class MyApp(App):
             self.active_layers[layer_key] = layer
             self.map_scene.add_widget(layer)
             
-            row = BoxLayout(orientation='horizontal', size_hint_y=None, height='40dp', spacing=3)
+            # Увеличенные размеры для горизонтального режима
+            row = BoxLayout(orientation='horizontal', size_hint_y=None, height='50dp', spacing=3)
             
             is_visible = self.layer_visibility[layer_key]
             btn = ToggleButton(
                 text=f"{layer_data.name} [{layer_data.vozrast}]", 
                 state='down' if is_visible else 'normal', 
-                size_hint_x=0.6,
+                size_hint_x=0.55,
                 font_size=self.get_font_size('small')
             )
             btn.layer_index = layer_key
             btn.bind(on_press=self.layer_click_manage)
             
-            btn_edit = Button(text='i', size_hint_x=0.2, font_size=self.get_font_size('small'))
+            btn_edit = Button(text='ⓘ', size_hint_x=0.225, font_size=self.get_font_size('large'))
             btn_edit.layer_index = layer_key
             btn_edit.bind(on_release=lambda instance: self.open_meta_popup(instance.layer_index))
             
-            btn_del = Button(text='x', size_hint_x=0.2, font_size=self.get_font_size('small'))
+            btn_del = Button(text='✕', size_hint_x=0.225, font_size=self.get_font_size('large'))
             btn_del.layer_index = layer_key
             btn_del.bind(on_release=self.delete_layer)
             
@@ -754,7 +766,7 @@ class MyApp(App):
                 if self.tool_mode in ['draw', 'erase']:
                     self.status_bar.text = f"Выбран Слой {self.selected_layer_key} ({self.tool_mode})"
                 else:
-                    self.status_bar.text = f"{layer_key} выбран. Нажмите (i) для редактирования атрибутов."
+                    self.status_bar.text = f"{layer_key} выбран. Нажмите (ⓘ) для редактирования атрибутов."
             else:
                 target_layer.opacity = 0.0
                 if self.selected_layer_key == layer_key:
@@ -770,21 +782,21 @@ class MyApp(App):
             return
 
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
-        self.age_in = TextInput(text=str(target_layer.vozrast), hint_text="Возраст", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
+        self.age_in = TextInput(text=str(target_layer.vozrast), hint_text="Возраст", multiline=False, size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         self.info_in = TextInput(text=str(target_layer.description), hint_text="Описание", multiline=True, font_size=self.get_font_size('normal'))
         
-        content.add_widget(Label(text=f"Атрибуты слоя {layer_key}", size_hint_y=None, height='30dp', font_size=self.get_font_size('normal')))
+        content.add_widget(Label(text=f"Атрибуты слоя {layer_key}", size_hint_y=None, height='40dp', font_size=self.get_font_size('normal')))
         content.add_widget(self.age_in)
         content.add_widget(self.info_in)
         
-        btn_lay = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
+        btn_lay = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='55dp')
         ok_b = Button(text="Сохранить", font_size=self.get_font_size('normal'))
         cncl_b = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_lay.add_widget(ok_b)
         btn_lay.add_widget(cncl_b)
         content.add_widget(btn_lay)
         
-        popup = Popup(title='Свойства объекта', content=content, size_hint=(0.9, 0.55))
+        popup = Popup(title='Свойства объекта', content=content, size_hint=(0.9, 0.6))
         
         def save_data(obj):
             target_layer.vozrast = self.age_in.text if self.age_in.text.strip() else "???"
