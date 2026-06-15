@@ -46,7 +46,7 @@ if platform == 'android':
                     Uri = autoclass('android.net.Uri')
                     
                     activity = PythonActivity.mActivity
-                    # Создаем намерение (Intent) открыть системные настройки для нашего приложения
+                    # Создаем намерение (Intent) открыть системные настройк�� для нашего приложения
                     intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                     uri = Uri.fromParts("package", activity.getPackageName(), None)
                     intent.setData(uri)
@@ -228,7 +228,7 @@ class MyApp(App):
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         content.add_widget(Label(text=f"Точка на карте: X={px}, Y={py}\nВведите географические координаты:", size_hint_y=None, height='50dp', font_size=self.get_font_size('normal')))
         
-        lat_input = TextInput(hint_text="Широта (Lat), например: 55.7558", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
+        lat_input = TextInput(hint_text="Широта (Lat), ��апример: 55.7558", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
         lon_input = TextInput(hint_text="Долгота (Lon), например: 37.6173", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
         
         content.add_widget(lat_input)
@@ -278,7 +278,7 @@ class MyApp(App):
         color_preview.bind(size=lambda w, v: setattr(color_preview.canvas.children[1], 'size', v))
 
         content.add_widget(Label(
-            text=f"Выбран цвет RGB{rgb_color}\nПикселей будет найдено по Delta-E ≤ {main.delta_e_tolerance}",
+            text=f"Выбр��н цвет RGB{rgb_color}\nПикселей будет найдено по Delta-E ≤ {main.delta_e_tolerance}",
             size_hint_y=None, height='50dp', font_size=self.get_font_size('small')
         ))
         content.add_widget(color_preview)
@@ -397,7 +397,7 @@ class MyApp(App):
             if success:
                 print(f"Проект сохранен: {full_path}")
         except Exception as e:
-            print(f"Ошибка при сохранении: {e}")
+            print(f"Ошиб��а при сохранении: {e}")
             
     def load_project_dialog(self):
         dialog = FileLoadDialog(
@@ -681,7 +681,7 @@ class MyApp(App):
             
         if len(main.sp_sloy) > 150:
             self.status_bar.text = f"Ошибка: Создано слишком много слоев ({len(main.sp_sloy)}). Увеличьте min_dist в настройках!"
-            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Увеличьте размер кисти/шага.")
+            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Увеличьте размер кисти/шага в настройках.")
             return  
             
         for child in list(self.map_scene.children):
@@ -690,6 +690,10 @@ class MyApp(App):
                 
         self.list_layout.clear_widgets()
         self.active_layers.clear()
+        
+        # ВАЖНО: Очистить layer_visibility ото всех слоёв, которые больше не существуют
+        current_layer_names = {str(layer_data.name) for layer_data in main.sp_sloy}
+        self.layer_visibility = {k: v for k, v in self.layer_visibility.items() if k in current_layer_names}
         
         self.tool_mode = 'view'
         self.selected_layer_key = None
@@ -823,21 +827,22 @@ class MyApp(App):
         layers_to_merge = selected_layers_data[1:]
         merge_keys = {str(l.name) for l in layers_to_merge}
 
+        # Объединяем данные слоёв
         for layer_data in layers_to_merge:
             base_layer_data.sp_pix.update(layer_data.sp_pix)
+            # Удаляем из layer_visibility удаляемые слои
             self.layer_visibility.pop(str(layer_data.name), None)
 
+        # Обновляем основной список слоёв
         main.sp_sloy = [layer for layer in main.sp_sloy if str(layer.name) not in merge_keys]
 
+        # Сбрасываем выделение
         self.layer_visibility[str(base_layer_data.name)] = False
         self.selected_layer_key = None
-
-        for child in list(self.map_scene.children):
-            if isinstance(child, FastPixelLayer):
-                self.map_scene.remove_widget(child)
         self.active_layers.clear()
 
-        self.status_bar.text = f"Слои объединены в '{base_layer_data.name}'. Нажмите кнопку слоя чтобы показать."
+        self.status_bar.text = f"Слои объединены в '{base_layer_data.name}'. Обновляю интерфейс..."
+        # Вызываем visual() для полного обновления интерфейса
         self.visual()
 
 
