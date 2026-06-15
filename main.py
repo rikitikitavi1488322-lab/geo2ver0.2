@@ -156,7 +156,7 @@ def segment_by_color(target_rgb, tolerance=None, layer_name=None):
     if len(sp_pix) == 0:
         return False, f"Цвет не найден на карте (tolerance={tol}). Попробуйте увеличить порог."
 
-    name = layer_name if layer_name else f"Слой_{len(sp_sloy)+1}"
+    name = layer_name if layer_name else f"{len(sp_sloy)+1}"
     lab_color = tuple(target_lab.tolist())
 
     # Проверяем дубликат имени

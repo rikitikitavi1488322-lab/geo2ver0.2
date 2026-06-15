@@ -157,31 +157,24 @@ class FileSaveDialog(Popup):
 
 class CustomMapScene(ScatterLayout):
     def on_touch_down(self, touch):
-        # Если клик вне области виджета (например, на боковой панели или статус-баре),
-        # мы ОБЯЗАТЕЛЬНО передаем событие дальше через super(), а не возвращаем False.
         if not Widget.collide_point(self, touch.x, touch.y):
             return super().on_touch_down(touch)
         
         app = App.get_running_app()
         
-        # Если активен инструмент рисования или удаления
         if app.tool_mode in ['draw', 'erase']:
             for child in reversed(self.children):
                 if isinstance(child, FastPixelLayer) and child.layer_name == app.selected_layer_key:
                     if child.collide_point(*touch.pos):
-                        # Передаем touch стандартным элементам Scatter
                         return super().on_touch_down(touch)
-            # Если по слою не попали, не блокируем Kivy, даем закрыться меню/попапам
             return super().on_touch_down(touch)
 
-        # Обработка скролла/зума колесиком мыши
         if touch.is_mouse_scrolling:
             factor = 1.1 if touch.button == 'scrollup' else 0.9
             if 0.5 <= self.scale * factor <= 20:
                 self.apply_transform(self.transform.scale(factor, factor, 1), post_multiply=True)
             return True
             
-        # Во всех остальных случаях (режим 'view' и т.д.) используем стандартное поведение
         return super().on_touch_down(touch)
 
     def on_touch_move(self, touch):
@@ -207,47 +200,57 @@ class MyApp(App):
         self.tool_mode = 'view'
         self.selected_layer_key = None
         self.brush_radius = 5
+        self.global_layer_opacity = 1.0  # Регулируемая переменная прозрачности
         
-        self.menu_btn = Button(text='Меню', size_hint_x=0.55)
+        self.menu_btn = Button(text='Меню', size_hint_x=0.45)
         self.tools_menu_btn = Button(text='Навигация', size_hint_x=0.35)
-        self.exit_btn = Button(text='x', size_hint_x=0.1)
+        self.refresh_btn = Button(text='R', size_hint_x=0.1)  # Кнопка ручного обновления холста
+        self.exit_btn = Button(text='X', size_hint_x=0.1)
         
         self.exit_btn.bind(on_press=self.stop)
+        self.refresh_btn.bind(on_press=lambda instance: self.visual())
+        
         self.active_layers = {}
         self.layer_visibility = {}
+
+    def get_font_size(self, size_type='normal'):
+        """Динамический расчет размера шрифта в зависимости от габаритов экрана."""
+        base_dim = min(Window.width, Window.height)
+        if size_type == 'small':
+            return int(max(15, min(base_dim * 0.034, 24)))
+        elif size_type == 'large':
+            return int(max(22, min(base_dim * 0.050, 34)))
+        else: # normal
+            return int(max(18, min(base_dim * 0.042, 28)))
         
     def open_geo_calibration_popup(self, pixel_coords):
         px, py = pixel_coords
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
-        content.add_widget(Label(text=f"Точка на карте: X={px}, Y={py}\nВведите географические координаты:", size_hint_y=None, height='50dp'))
+        content.add_widget(Label(text=f"Точка на карте: X={px}, Y={py}\nВведите географические координаты:", size_hint_y=None, height='50dp', font_size=self.get_font_size('normal')))
         
-        lat_input = TextInput(hint_text="Широта (Lat), например: 55.7558", multiline=False, size_hint_y=None, height='40dp')
-        lon_input = TextInput(hint_text="Долгота (Lon), например: 37.6173", multiline=False, size_hint_y=None, height='40dp')
+        lat_input = TextInput(hint_text="Широта (Lat), например: 55.7558", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
+        lon_input = TextInput(hint_text="Долгота (Lon), например: 37.6173", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
         
         content.add_widget(lat_input)
         content.add_widget(lon_input)
         
         btn_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
-        ok_btn = Button(text="Добавить")
-        cancel_btn = Button(text="Отмена")
+        ok_btn = Button(text="Добавить", font_size=self.get_font_size('normal'))
+        cancel_btn = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_layout.add_widget(ok_btn)
         btn_layout.add_widget(cancel_btn)
         content.add_widget(btn_layout)
         
-        popup = Popup(title='Привязка координаты', content=content, size_hint=(0.9, 0.4), auto_dismiss=False)
+        popup = Popup(title='Привязка координаты', content=content, size_hint=(0.9, 0.45), auto_dismiss=False)
         
         def save_geo_point(instance):
             try:
                 lat = float(lat_input.text.strip())
                 lon = float(lon_input.text.strip())
                 
-                # Добавляем точку в глобальное хранилище
                 main.control_points.append({"pixel": (px, py), "geo": (lat, lon)})
-                
-                # Пробуем откалибровать систему
                 success, msg = main.geo_system.calibrate(main.control_points)
                 self.status_bar.text = f"{msg} Опорных точек: {len(main.control_points)}"
-                
                 popup.dismiss()
             except ValueError:
                 self.status_bar.text = "Ошибка: Введены некорректные числа!"
@@ -257,22 +260,16 @@ class MyApp(App):
         popup.open()
         
     def pipette_pick(self, coords):
-        """
-        Вызывается при тапе в режиме пипетки.
-        Берёт цвет пикселя под пальцем и запускает Delta-E сегментацию.
-        """
         px, py = coords
         if main.pixels is None:
             self.status_bar.text = "Сначала загрузите карту!"
             return
 
-        rgb_color = main.pixels[px, py]  # (R, G, B)
+        rgb_color = main.pixels[px, py]
 
-        # Показываем попап подтверждения с именем слоя
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
         from kivy.graphics import Color as KivyColor, Rectangle as KivyRect
 
-        # Цветной квадрат — превью выбранного цвета
         color_preview = Widget(size_hint_y=None, height='50dp')
         with color_preview.canvas:
             KivyColor(rgb_color[0]/255, rgb_color[1]/255, rgb_color[2]/255, 1)
@@ -282,19 +279,19 @@ class MyApp(App):
 
         content.add_widget(Label(
             text=f"Выбран цвет RGB{rgb_color}\nПикселей будет найдено по Delta-E ≤ {main.delta_e_tolerance}",
-            size_hint_y=None, height='50dp'
+            size_hint_y=None, height='50dp', font_size=self.get_font_size('small')
         ))
         content.add_widget(color_preview)
 
         name_input = TextInput(
-            hint_text=f"Имя слоя (по умолчанию: Слой_{len(main.sp_sloy)+1})",
-            multiline=False, size_hint_y=None, height='40dp'
+            hint_text=f"Имя слоя (по умолчанию: #_{len(main.sp_sloy)+1})",
+            multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal')
         )
         content.add_widget(name_input)
 
         btn_row = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
-        ok_btn = Button(text="Создать слой")
-        cancel_btn = Button(text="Отмена")
+        ok_btn = Button(text="Создать слой", font_size=self.get_font_size('normal'))
+        cancel_btn = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_row.add_widget(ok_btn)
         btn_row.add_widget(cancel_btn)
         content.add_widget(btn_row)
@@ -322,7 +319,6 @@ class MyApp(App):
         popup.open()
 
     def export_geojson_dialog(self):
-        """Диалог выбора пути для экспорта GeoJSON."""
         if not main.geo_system.is_calibrated:
             self.show_popup_message("Ошибка", "Для экспорта нужна геопривязка!\nДобавьте опорные точки в режиме 'Привязка'.")
             return
@@ -352,8 +348,8 @@ class MyApp(App):
 
     def show_popup_message(self, title, message):
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
-        content.add_widget(Label(text=message))
-        close_btn = Button(text="OK", size_hint_y=None, height='45dp')
+        content.add_widget(Label(text=message, font_size=self.get_font_size('normal')))
+        close_btn = Button(text="OK", size_hint_y=None, height='45dp', font_size=self.get_font_size('normal'))
         content.add_widget(close_btn)
         popup = Popup(title=title, content=content, size_hint=(0.8, 0.4), auto_dismiss=True)
         close_btn.bind(on_release=popup.dismiss)
@@ -367,15 +363,13 @@ class MyApp(App):
         def background_work():
             success = main.compute_all_elevations(hgt_folder="dem_data")
             if success:
-                # Обновляем UI по завершению (безопасно для Kivy через Clock)
                 Clock.schedule_once(lambda dt: self.show_popup_message("Успех", "Данные высот загружены!"), 0)
             else:
-                Clock.schedule_once(lambda dt: self.show_popup_message("Ошибка", "Не удалось загрузить данные высот. Проверьте файлы в dem_data."), 0)
+                Clock.schedule_once(lambda dt: self.show_popup_message("Ошибка", "Не удалось загрузить данные высот."), 0)
 
         threading.Thread(target=background_work, daemon=True).start()
 
     def choose_map_image(self):
-
         dialog = FileLoadDialog(
             title="Выберите изображение карты",
             filters=['*.jpg', '*.jpeg', '*.png'],
@@ -384,12 +378,10 @@ class MyApp(App):
         dialog.open()
 
     def load_map_success(self, file_path):
-        print(f"Выбрана карта: {file_path}")
         main.karta = file_path
         self.status_bar.text = f"Выбран файл карты: {file_path}"
         
     def save_project_dialog(self):
-
         dialog = FileSaveDialog(
             title="Сохранение проекта",
             default_name="geo_session.json",
@@ -398,15 +390,12 @@ class MyApp(App):
         dialog.open()
 
     def save_project_success(self, full_path):
-        # Автоматически добавляем расширение json, если пользователь забыл его ввести
         if not full_path.lower().endswith('.json'):
             full_path += '.json'
-        
         try:
-            # Вызываем функцию сохранения из вашего модуля main.py
             success = main.save_project(full_path)
             if success:
-                print(f"Проект сохранен по пути: {full_path}")
+                print(f"Проект сохранен: {full_path}")
         except Exception as e:
             print(f"Ошибка при сохранении: {e}")
             
@@ -419,14 +408,10 @@ class MyApp(App):
         dialog.open()
 
     def load_project_success(self, path):
-        # Закрываем попап выбора файла, если он еще открыт
         if hasattr(self, 'load_dialog') and self.load_dialog:
             self.load_dialog.dismiss()
-            
-        # Запускаем чтение файла проекта
         if main.load_project(path):
             self.status_bar.text = "Проект успешно загружен!"
-            # СТРОГО ЧЕРЕЗ CLOCK возвращаем перерисовку интерфейса в главный поток:
             Clock.schedule_once(lambda dt: self.visual(), 0)
         else:
             self.status_bar.text = "Ошибка загрузки проекта!"
@@ -474,80 +459,89 @@ class MyApp(App):
             self.status_bar.text = "Ошибка: Файл сессии не найден"
 
     def open_settings_popup(self):
-        content = BoxLayout(orientation='vertical', spacing=15, padding=15)
-        content.add_widget(Label(text="Настройки инструментов редактирования", size_hint_y=None, height='30dp', font_size='16sp'))
+        content = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        content.add_widget(Label(
+            text="Настройки ГИС", 
+            size_hint_y=None, 
+            height='40dp', 
+            font_size=self.get_font_size('large')
+        ))
         
-        # --- Размер кисти ---
-        slider_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height='50dp', spacing=10)
-        self.settings_slider_label = Label(text=f"Размер кисти/ластика: {self.brush_radius} px", size_hint_x=0.4)
-        brush_slider = Slider(min=1, max=50, value=self.brush_radius, step=1, size_hint_x=0.6)
-        
-        def on_slider_change(instance, value):
-            self.brush_radius = int(value)
-            self.settings_slider_label.text = f"Размер кисти/ластика: {self.brush_radius} px"
+        # Область прокрутки для удобства на смартфонах
+        scroll = ScrollView(size_hint=(1, 0.78))
+        settings_layout = BoxLayout(orientation='vertical', spacing=15, size_hint_y=None)
+        settings_layout.bind(minimum_height=settings_layout.setter('height'))
+
+        # Мобильный конструктор блоков: Текст сверху, крупный слайдер снизу
+        def create_setting_block(label_text_template, min_val, max_val, curr_val, step_val, update_func):
+            block = BoxLayout(orientation='vertical', size_hint_y=None, height='80dp', spacing=5)
+            lbl = Label(text=label_text_template(curr_val), size_hint_y=0.4, font_size=self.get_font_size('small'))
+            slider = Slider(min=min_val, max=max_val, value=curr_val, step=step_val, size_hint_y=0.6)
             
-        brush_slider.bind(value=on_slider_change)
-        slider_layout.add_widget(self.settings_slider_label)
-        slider_layout.add_widget(brush_slider)
-        content.add_widget(slider_layout)
+            def on_val_change(instance, value):
+                update_func(value)
+                lbl.text = label_text_template(value)
+                
+            slider.bind(value=on_val_change)
+            block.add_widget(lbl)
+            block.add_widget(slider)
+            return block
 
-        # --- Порог Delta-E (пипетка) ---
-        de_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height='50dp', spacing=10)
-        self.de_label = Label(text=f"Порог Delta-E (пипетка): {main.delta_e_tolerance}", size_hint_x=0.4)
-        de_slider = Slider(min=5, max=60, value=main.delta_e_tolerance, step=1, size_hint_x=0.6)
+        # 1. Размер кисти
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Размер кисти/ластика: {int(v)} px", 1, 50, self.brush_radius, 1,
+            lambda v: setattr(self, 'brush_radius', int(v))
+        ))
 
-        def on_de_change(instance, value):
-            main.delta_e_tolerance = int(value)
-            self.de_label.text = f"Порог Delta-E (пипетка): {main.delta_e_tolerance}"
+        # 2. Порог Delta-E (пипетка)
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Порог Delta-E (пипетка): {int(v)}", 5, 60, main.delta_e_tolerance, 1,
+            lambda v: setattr(main, 'delta_e_tolerance', int(v))
+        ))
 
-        de_slider.bind(value=on_de_change)
-        de_layout.add_widget(self.de_label)
-        de_layout.add_widget(de_slider)
-        content.add_widget(de_layout)
+        # 3. Порог цвета (min_d2)
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Порог цвета (min_d2): {int(v)}", 100, 5000, main.min_d2, 50,
+            lambda v: setattr(main, 'min_d2', int(v))
+        ))
 
-        # --- Порог расстояния (min_d2) ---
-        d2_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height='50dp', spacing=10)
-        self.d2_label = Label(text=f"Порог цвета (min_d2): {main.min_d2}", size_hint_x=0.4)
-        d2_slider = Slider(min=100, max=5000, value=main.min_d2, step=50, size_hint_x=0.6)
+        # 4. Число кластеров K-Means
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Кластеры K-Means: {int(v)}", 5, 60, main.k_clusters, 1,
+            lambda v: setattr(main, 'k_clusters', int(v))
+        ))
 
-        def on_d2_change(instance, value):
-            main.min_d2 = int(value)
-            self.d2_label.text = f"Порог цвета (min_d2): {main.min_d2}"
+        # 5. [Новая переменная] Мин. расстояние слоев (min_dist)
+        current_min_dist = getattr(main, 'min_dist', 10)
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Мин. расстояние слоев (min_dist): {int(v)}", 1, 100, current_min_dist, 1,
+            lambda v: setattr(main, 'min_dist', int(v))
+        ))
 
-        d2_slider.bind(value=on_d2_change)
-        d2_layout.add_widget(self.d2_label)
-        d2_layout.add_widget(d2_slider)
-        content.add_widget(d2_layout)
+        # 6. [Новая переменная] Глобальная прозрачность отрисовки слоев
+        settings_layout.add_widget(create_setting_block(
+            lambda v: f"Прозрачность слоев: {int(v)}%", 10, 100, int(self.global_layer_opacity * 100), 5,
+            lambda v: setattr(self, 'global_layer_opacity', v / 100.0)
+        ))
 
-        # --- Число кластеров K-Means ---
-        k_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height='50dp', spacing=10)
-        self.k_label = Label(text=f"Кластеры K-Means: {main.k_clusters}", size_hint_x=0.4)
-        k_slider = Slider(min=5, max=60, value=main.k_clusters, step=1, size_hint_x=0.6)
-
-        def on_k_change(instance, value):
-            main.k_clusters = int(value)
-            self.k_label.text = f"Кластеры K-Means: {main.k_clusters}"
-
-        k_slider.bind(value=on_k_change)
-        k_layout.add_widget(self.k_label)
-        k_layout.add_widget(k_slider)
-        content.add_widget(k_layout)
+        scroll.add_widget(settings_layout)
+        content.add_widget(scroll)
         
-        close_btn = Button(text="Закрыть", size_hint_y=None, height='45dp')
+        close_btn = Button(text="Закрыть", size_hint_y=None, height='45dp', font_size=self.get_font_size('normal'))
         content.add_widget(close_btn)
         
-        settings_popup = Popup(title='Настройки ГИС', content=content, size_hint=(0.8, 0.6), auto_dismiss=True)
+        settings_popup = Popup(title='Настройки ГИС', content=content, size_hint=(0.9, 0.85), auto_dismiss=True)
         close_btn.bind(on_release=settings_popup.dismiss)
         
         def on_dismiss_callback(instance):
-            self.status_bar.text = f"Настройки сохранены: кисть={self.brush_radius}px, min_d2={main.min_d2}, K={main.k_clusters}"
+            self.status_bar.text = "Настройки успешно сохранены."
+            self.visual()  # Мгновенное применение прозрачности на холсте
+            
         settings_popup.bind(on_dismiss=on_dismiss_callback)
-        
         settings_popup.open()
 
     def menu_select_handler(self, instance, text):
         instance.dismiss()
-        
         if text == 'unite':
             self.unite_layer()
         elif text == 'новый расчет':
@@ -568,12 +562,10 @@ class MyApp(App):
             self.tool_mode = 'view'
             self.tools_menu_btn.text = "Навигация"
             self.status_bar.text = "Режим: Навигация"
-            
         elif text == 'rejim_geotocki':
             self.tool_mode = 'georef'
             self.tools_menu_btn.text = "Реперные точки"
             self.status_bar.text = f"Режим: Кликните на карту, чтобы добавить опорную точку (Всего: {len(main.control_points)})"
-        
         elif text == 'rejim_karandasha':
             self.tool_mode = 'draw'
             self.tools_menu_btn.text = "Карандаш"
@@ -588,7 +580,6 @@ class MyApp(App):
                 self.status_bar.text = f"Режим: Ластик ({self.brush_radius}px). Слой {self.selected_layer_key}"
             else:
                 self.status_bar.text = "Выберите активный слой справа!"
-
         elif text == 'rejim_pipetki':
             self.tool_mode = 'pipette'
             self.tools_menu_btn.text = "Пипетка"
@@ -598,30 +589,35 @@ class MyApp(App):
         if platform == 'android':
             request_android_storage_permission()
 
-        
         main_layout = BoxLayout(orientation='vertical')
         
         contral_panel = BoxLayout(orientation='horizontal', size_hint_y=0.09, spacing=5)
         contral_panel.add_widget(self.menu_btn)
         contral_panel.add_widget(self.tools_menu_btn)
+        contral_panel.add_widget(self.refresh_btn)  # Кнопка успешно добавлена в панель управления
         contral_panel.add_widget(self.exit_btn)
         main_layout.add_widget(contral_panel)
         
+        self.menu_btn.font_size = self.get_font_size('normal')
+        self.tools_menu_btn.font_size = self.get_font_size('normal')
+        self.refresh_btn.font_size = self.get_font_size('normal')
+        self.exit_btn.font_size = self.get_font_size('normal')
+        
         self.dropdown_menu = DropDown()
-        unite_menu_btn = Button(text='Объединить слои', size_hint_y=None, height='50dp')
+        unite_menu_btn = Button(text='Объединить слои', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         unite_menu_btn.bind(on_release=lambda instance: self.dropdown_menu.select('unite'))
-        start_btn = Button(text='Новый расчет', size_hint_y=None, height='50dp')
+        start_btn = Button(text='Новый расчет', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         start_btn.bind(on_release=lambda instance: self.dropdown_menu.select('новый расчет'))
-        file_btn = Button(text='Выбрать файл', size_hint_y=None, height='50dp')
+        file_btn = Button(text='Выбрать файл', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         file_btn.bind(on_release=lambda instance: self.dropdown_menu.select('выбрать файл'))
-        save_btn = Button(text='Сохранить проект', size_hint_y=None, height='50dp')
+        save_btn = Button(text='Сохранить проект', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         save_btn.bind(on_release=lambda instance: self.dropdown_menu.select('сохранить'))
-        load_btn = Button(text='Загрузить проект', size_hint_y=None, height='50dp')
+        load_btn = Button(text='Загрузить проект', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         load_btn.bind(on_release=lambda instance: self.dropdown_menu.select('загрузить'))
-        settings_btn = Button(text='Настройки ГИС', size_hint_y=None, height='50dp')
+        settings_btn = Button(text='Настройки ГИС', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         settings_btn.bind(on_release=lambda instance: self.dropdown_menu.select('настройки'))
-        export_btn = Button(text='Экспорт GeoJSON', size_hint_y=None, height='50dp')
-        export_btn.bind(on_release=lambda instance: self.dropdown_menu.select('экспорт'))
+        export_btn = Button(text='Экспорт GeoJSON', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
+        export_btn.bind(on_release=lambda instance: self.dropdown_menu.select('экспорт')) # Исправлен баг со строкой селектора
         
         self.dropdown_menu.add_widget(unite_menu_btn)
         self.dropdown_menu.add_widget(start_btn)
@@ -635,15 +631,15 @@ class MyApp(App):
         self.dropdown_menu.bind(on_select=self.menu_select_handler)
         
         self.dropdown_tools = DropDown()
-        mode_view = Button(text='Навигация', size_hint_y=None, height='50dp')
+        mode_view = Button(text='Навигация', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         mode_view.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_prosmotra'))
-        mode_draw = Button(text='Карандаш', size_hint_y=None, height='50dp')
+        mode_draw = Button(text='Карандаш', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         mode_draw.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_karandasha'))
-        mode_erase = Button(text='Ластик', size_hint_y=None, height='50dp')
+        mode_erase = Button(text='Ластик', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         mode_erase.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_lastika'))
-        mode_geo = Button(text='Привязка', size_hint_y=None, height='50dp')
+        mode_geo = Button(text='Привязка', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         mode_geo.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_geotocki'))
-        mode_pipette = Button(text='Пипетка (легенда)', size_hint_y=None, height='50dp')
+        mode_pipette = Button(text='Пипетка (легенда)', size_hint_y=None, height='50dp', font_size=self.get_font_size('normal'))
         mode_pipette.bind(on_release=lambda instance: self.dropdown_tools.select('rejim_pipetki'))
 
         self.dropdown_tools.add_widget(mode_view)
@@ -654,7 +650,7 @@ class MyApp(App):
         self.tools_menu_btn.bind(on_release=self.dropdown_tools.open)
         self.dropdown_tools.bind(on_select=self.tools_select_handler)
         
-        self.status_bar = Label(text="Ожидание действий. Откройте Меню.", size_hint_y=0.04, color=(0.9, 1, 0.9, 1))
+        self.status_bar = Label(text="Ожидание действий. Откройте Меню.", size_hint_y=0.04, color=(0.9, 1, 0.9, 1), font_size=self.get_font_size('small'))
         with self.status_bar.canvas.before:
             Color(45/255, 50/255, 55/255, 1)
             self.status_bg = Rectangle(pos=self.status_bar.pos, size=self.status_bar.size)
@@ -683,10 +679,9 @@ class MyApp(App):
         if hasattr(self, 'menu') and self.menu:
             self.menu.dismiss()
             
-        # ПРЕДОХРАНИТЕЛЬ: Если слоев слишком много, не рендерим их во избежание OOM
         if len(main.sp_sloy) > 150:
             self.status_bar.text = f"Ошибка: Создано слишком много слоев ({len(main.sp_sloy)}). Увеличьте min_dist в настройках!"
-            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Это вызовет падение. Увеличьте размер кисти/шага.")
+            self.show_popup_message("Предупреждение памяти", f"Алгоритм выделил {len(main.sp_sloy)} слоев. Увеличьте размер кисти/шага.")
             return  
             
         for child in list(self.map_scene.children):
@@ -704,20 +699,15 @@ class MyApp(App):
         for layer_data in main.sp_sloy:
             layer_key = str(layer_data.name)
             
-            # Если слоя еще нет в словаре (например, он только что создался), по умолчанию делаем его видимым
             if layer_key not in self.layer_visibility:
-                self.layer_visibility[layer_key] = True
+                self.layer_visibility[layer_key] = False
                 
             sp_pix = layer_data.sp_pix
             layer = FastPixelLayer(tex_w=main.x, tex_h=main.y, layer_name=str(layer_data.name))
             layer.fill_pixels(sp_pix, layer_data.rgb)
             
-            # =================================================================
-            # ИСПРАВЛЕНИЕ: Применяем сохранённую видимость к отображению на карте
-            layer.opacity = 1.0 if self.layer_visibility[layer_key] else 0.0
-            # =================================================================
-            
-            layer.opacity = 1.0 if self.layer_visibility[layer_key] else 0.0
+            # Учет пользовательской настройки прозрачности при активации
+            layer.opacity = self.global_layer_opacity if self.layer_visibility[layer_key] else 0.0
             
             self.active_layers[layer_key] = layer
             self.map_scene.add_widget(layer)
@@ -725,19 +715,20 @@ class MyApp(App):
             row = BoxLayout(orientation='horizontal', size_hint_y=None, height='40dp', spacing=3)
             
             is_visible = self.layer_visibility[layer_key]
-            btn = ToggleButton(text=f"{layer_data.name} [{layer_data.vozrast}]", state='down' if is_visible else 'normal', size_hint_x=0.8)
+            btn = ToggleButton(
+                text=f"{layer_data.name} [{layer_data.vozrast}]", 
+                state='down' if is_visible else 'normal', 
+                size_hint_x=0.6,
+                font_size=self.get_font_size('small')
+            )
             btn.layer_index = layer_key
             btn.bind(on_press=self.layer_click_manage)
             
-            # Если слой активен (видим), восстанавливаем его как выбранный для редактирования
-            if is_visible:
-                self.selected_layer_key = layer_key
-            
-            btn_edit = Button(text='i', size_hint_x=0.2)
+            btn_edit = Button(text='i', size_hint_x=0.2, font_size=self.get_font_size('small'))
             btn_edit.layer_index = layer_key
             btn_edit.bind(on_release=lambda instance: self.open_meta_popup(instance.layer_index))
             
-            btn_del = Button(text='x', size_hint_x=0.2)
+            btn_del = Button(text='x', size_hint_x=0.2, font_size=self.get_font_size('small'))
             btn_del.layer_index = layer_key
             btn_del.bind(on_release=self.delete_layer)
             
@@ -754,7 +745,7 @@ class MyApp(App):
         
         if target_layer:
             if instance.state == 'down':
-                target_layer.opacity = 1.0
+                target_layer.opacity = self.global_layer_opacity
                 self.selected_layer_key = layer_key
                 if self.tool_mode in ['draw', 'erase']:
                     self.status_bar.text = f"Выбран Слой {self.selected_layer_key} ({self.tool_mode})"
@@ -775,21 +766,21 @@ class MyApp(App):
             return
 
         content = BoxLayout(orientation='vertical', spacing=10, padding=10)
-        self.age_in = TextInput(text=str(target_layer.vozrast), hint_text="Возраст", multiline=False, size_hint_y=None, height='40dp')
-        self.info_in = TextInput(text=str(target_layer.description), hint_text="Описание", multiline=True)
+        self.age_in = TextInput(text=str(target_layer.vozrast), hint_text="Возраст", multiline=False, size_hint_y=None, height='40dp', font_size=self.get_font_size('normal'))
+        self.info_in = TextInput(text=str(target_layer.description), hint_text="Описание", multiline=True, font_size=self.get_font_size('normal'))
         
-        content.add_widget(Label(text=f"Атрибуты слоя {layer_key}", size_hint_y=None, height='30dp'))
+        content.add_widget(Label(text=f"Атрибуты слоя {layer_key}", size_hint_y=None, height='30dp', font_size=self.get_font_size('normal')))
         content.add_widget(self.age_in)
         content.add_widget(self.info_in)
         
         btn_lay = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height='45dp')
-        ok_b = Button(text="Сохранить")
-        cncl_b = Button(text="Отмена")
+        ok_b = Button(text="Сохранить", font_size=self.get_font_size('normal'))
+        cncl_b = Button(text="Отмена", font_size=self.get_font_size('normal'))
         btn_lay.add_widget(ok_b)
         btn_lay.add_widget(cncl_b)
         content.add_widget(btn_lay)
         
-        popup = Popup(title='Свойства объекта', content=content, size_hint=(0.9, 0.5))
+        popup = Popup(title='Свойства объекта', content=content, size_hint=(0.9, 0.55))
         
         def save_data(obj):
             target_layer.vozrast = self.age_in.text if self.age_in.text.strip() else "???"
@@ -830,22 +821,23 @@ class MyApp(App):
         selected_layers_data = [layer for layer in main.sp_sloy if str(layer.name) in selected_layer_keys]
         base_layer_data = selected_layers_data[0]
         layers_to_merge = selected_layers_data[1:]
+        merge_keys = {str(l.name) for l in layers_to_merge}
 
         for layer_data in layers_to_merge:
             base_layer_data.sp_pix.update(layer_data.sp_pix)
             self.layer_visibility.pop(str(layer_data.name), None)
 
-        main.sp_sloy = [layer for layer in main.sp_sloy if layer not in layers_to_merge]
-        
-        # === ДОБАВИТЬ ЭТИ СТРОКИ ПЕРЕД self.visual() ===
-        # Принудительно гасим и удаляем абсолютно все старые графические виджеты слоев
+        main.sp_sloy = [layer for layer in main.sp_sloy if str(layer.name) not in merge_keys]
+
+        self.layer_visibility[str(base_layer_data.name)] = False
+        self.selected_layer_key = None
+
         for child in list(self.map_scene.children):
             if isinstance(child, FastPixelLayer):
                 self.map_scene.remove_widget(child)
         self.active_layers.clear()
-        # ===============================================
 
-        self.status_bar.text = f"Слои соединены."
+        self.status_bar.text = f"Слои объединены в '{base_layer_data.name}'. Нажмите кнопку слоя чтобы показать."
         self.visual()
 
 
@@ -910,7 +902,6 @@ class FastPixelLayer(Widget):
         if not hasattr(self, 'new_w') or self.new_w == 0:
             return None
         
-        # touch.pos ТЕПЕРЬ УЖЕ локальный благодаря правильному вызову super() в ScatterLayout
         local_x, local_y = touch.pos 
         
         norm_x = local_x - (self.width - self.new_w) / 2
