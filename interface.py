@@ -212,8 +212,8 @@ class MyApp(App):
         
         self.menu_btn = Button(text='Меню', size_hint_x=0.35)
         self.tools_menu_btn = Button(text='Навигация', size_hint_x=0.35)
-        self.refresh_btn = Button(text='↺', size_hint_x=0.15)  # Кнопка ручного обновления холста
-        self.exit_btn = Button(text='✕', size_hint_x=0.15)
+        self.refresh_btn = Button(text='R', size_hint_x=0.15)  # Кнопка ручного обновления холста
+        self.exit_btn = Button(text='X', size_hint_x=0.15)
         
         self.exit_btn.bind(on_press=self.stop)
         self.refresh_btn.bind(on_press=lambda instance: self.visual())
@@ -475,16 +475,32 @@ class MyApp(App):
             font_size=self.get_font_size('large')
         ))
         
-        # Область прокрутки для удобства на смартфонах
-        scroll = ScrollView(size_hint=(1, 0.75))
-        settings_layout = BoxLayout(orientation='vertical', spacing=15, size_hint_y=None)
+        # Область прокрутки с оптимизацией тача и видимой полосой для смартфонов
+        scroll = ScrollView(
+            size_hint=(1, 0.75), 
+            bar_width='10dp', 
+            scroll_type=['content', 'bars']
+        )
+        settings_layout = BoxLayout(orientation='vertical', spacing=20, size_hint_y=None)
         settings_layout.bind(minimum_height=settings_layout.setter('height'))
 
-        # Мобильный конструктор блоков: Текст сверху, крупный слайдер снизу
+        # Мобильный конструктор блоков: Текст сверху, фиксированный слайдер снизу,
+        # увеличенная общая высота оставляет «безопасные зоны» для вертикального свайпа.
         def create_setting_block(label_text_template, min_val, max_val, curr_val, step_val, update_func):
-            block = BoxLayout(orientation='vertical', size_hint_y=None, height='90dp', spacing=5)
-            lbl = Label(text=label_text_template(curr_val), size_hint_y=0.35, font_size=self.get_font_size('small'))
-            slider = Slider(min=min_val, max=max_val, value=curr_val, step=step_val, size_hint_y=0.65)
+            block = BoxLayout(orientation='vertical', size_hint_y=None, height='130dp', spacing=5, padding=[10, 5, 10, 5])
+            
+            lbl = Label(
+                text=label_text_template(curr_val), 
+                size_hint_y=None, 
+                height='60dp', 
+                font_size=self.get_font_size('small'),
+                halign='center',
+                valign='middle'
+            )
+            # Включаем автоматический перенос строк для длинных описаний настроек
+            lbl.bind(size=lambda l, s: setattr(l, 'text_size', s))
+            
+            slider = Slider(min=min_val, max=max_val, value=curr_val, step=step_val, size_hint_y=None, height='45dp')
             
             def on_val_change(instance, value):
                 update_func(value)
@@ -497,38 +513,38 @@ class MyApp(App):
 
         # 1. Размер кисти
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Размер кисти/ластика: {int(v)} px", 1, 50, self.brush_radius, 1,
+            lambda v: f"Размер кисти/ластика: {int(v)} px\n[Радиус ручной дорисовки или стирания пикселей активного слоя]", 1, 50, self.brush_radius, 1,
             lambda v: setattr(self, 'brush_radius', int(v))
         ))
 
         # 2. Порог Delta-E (пипетка)
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Порог Delta-E (пипетка): {int(v)}", 5, 60, main.delta_e_tolerance, 1,
+            lambda v: f"Порог Delta-E (пипетка): {int(v)}\n[Чувствительность подбора цветов: меньше — строже, больше — захватит схожие оттенки]", 5, 60, main.delta_e_tolerance, 1,
             lambda v: setattr(main, 'delta_e_tolerance', int(v))
         ))
 
         # 3. Порог цвета (min_d2)
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Порог цвета (min_d2): {int(v)}", 100, 5000, main.min_d2, 50,
+            lambda v: f"Порог цвета (min_d2): {int(v)}\n[Грубость цветового разделения при автоматической векторизации карты]", 100, 5000, main.min_d2, 50,
             lambda v: setattr(main, 'min_d2', int(v))
         ))
 
         # 4. Число кластеров K-Means
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Кластеры K-Means: {int(v)}", 5, 60, main.k_clusters, 1,
+            lambda v: f"Кластеры K-Means: {int(v)}\n[Количество целевых базовых цветов, на которые ядро делит изображение]", 5, 60, main.k_clusters, 1,
             lambda v: setattr(main, 'k_clusters', int(v))
         ))
 
-        # 5. [Новая переменная] Мин. расстояние слоев (min_dist)
+        # 5. Мин. расстояние слоев (min_dist)
         current_min_dist = getattr(main, 'min_dist', 10)
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Мин. расстояние слоев (min_dist): {int(v)}", 1, 100, current_min_dist, 1,
+            lambda v: f"Мин. расстояние слоев (min_dist): {int(v)}\n[Порог пространственного слияния: предотвращает избыточное дробление на мелкие слои]", 1, 100, current_min_dist, 1,
             lambda v: setattr(main, 'min_dist', int(v))
         ))
 
-        # 6. [Новая переменная] Глобальная прозрачность отрисовки слоев
+        # 6. Глобальная прозрачность отрисовки слоев
         settings_layout.add_widget(create_setting_block(
-            lambda v: f"Прозрачность слоев: {int(v)}%", 10, 100, int(self.global_layer_opacity * 100), 5,
+            lambda v: f"Прозрачность слоев: {int(v)}%\n[Глобальная непрозрачность накладываемых слоев поверх исходной карты]", 10, 100, int(self.global_layer_opacity * 100), 5,
             lambda v: setattr(self, 'global_layer_opacity', v / 100.0)
         ))
 
@@ -687,8 +703,8 @@ class MyApp(App):
         return main_layout
 
     def visual(self):
-        if hasattr(self, 'menu') and self.menu:
-            self.menu.dismiss()
+        if hasattr(self, 'dropdown_menu') and self.dropdown_menu:
+            self.dropdown_menu.dismiss()
             
         if len(main.sp_sloy) > 150:
             self.status_bar.text = f"Ошибка: Создано слишком много слоев ({len(main.sp_sloy)}). Увеличьте min_dist в настройках!"
@@ -738,7 +754,7 @@ class MyApp(App):
                 font_size=self.get_font_size('small')
             )
             btn.layer_index = layer_key
-            btn.bind(on_press=self.layer_click_manage)
+            btn.bind(on_release=self.layer_click_manage)
             
             btn_edit = Button(text='ⓘ', size_hint_x=0.225, font_size=self.get_font_size('large'))
             btn_edit.layer_index = layer_key
@@ -756,11 +772,12 @@ class MyApp(App):
     def layer_click_manage(self, instance):
         layer_key = instance.layer_index
         target_layer = self.active_layers.get(layer_key)
-        
-        self.layer_visibility[layer_key] = (instance.state == 'down')
+        # on_release — state уже переключён Kivy, читаем актуальное значение
+        visible = (instance.state == 'down')
+        self.layer_visibility[layer_key] = visible
         
         if target_layer:
-            if instance.state == 'down':
+            if visible:
                 target_layer.opacity = self.global_layer_opacity
                 self.selected_layer_key = layer_key
                 if self.tool_mode in ['draw', 'erase']:
@@ -811,14 +828,19 @@ class MyApp(App):
     def delete_layer(self, instance):
         layer_key = instance.layer_index
         self.layer_visibility.pop(layer_key, None)
-        target_layer = self.active_layers.get(layer_key)
-        if target_layer and target_layer.parent:
-            target_layer.parent.remove_widget(target_layer)
-            del self.active_layers[layer_key]
+
+        target_layer = self.active_layers.pop(layer_key, None)
+        if target_layer:
+            for child in list(self.map_scene.children):
+                if child is target_layer:
+                    self.map_scene.remove_widget(child)
+                    break
+
         if instance.parent:
             row_container = instance.parent
             if row_container.parent:
                 row_container.parent.remove_widget(row_container)
+
         main.sp_sloy = [s for s in main.sp_sloy if str(s.name) != layer_key]
         if self.selected_layer_key == layer_key:
             self.selected_layer_key = None
@@ -851,10 +873,13 @@ class MyApp(App):
         # Сбрасываем выделение
         self.layer_visibility[str(base_layer_data.name)] = False
         self.selected_layer_key = None
+
+        for child in list(self.map_scene.children):
+            if isinstance(child, FastPixelLayer):
+                self.map_scene.remove_widget(child)
         self.active_layers.clear()
 
         self.status_bar.text = f"Слои объединены в '{base_layer_data.name}'. Обновляю интерфейс..."
-        # Вызываем visual() для полного обновления интерфейса
         self.visual()
 
 
