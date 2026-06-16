@@ -28,7 +28,7 @@ version = 0.1
 requirements = python3, kivy, pillow, numpy, pyjnius, android
 
 # (str) Ориентация экрана (выставлена альбомная, как в твоих логах)
-orientation = landscape
+orientation = all
 
 # (bool) Полноэкранный режим
 fullscreen = 1
